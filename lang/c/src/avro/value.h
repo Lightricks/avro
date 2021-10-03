@@ -25,11 +25,11 @@ extern "C" {
 #endif
 
 #include <errno.h>
-#include <avro/platform.h>
+#include "platform.h"
 #include <stdlib.h>
 
-#include <avro/data.h>
-#include <avro/schema.h>
+#include "data.h"
+#include "schema.h"
 
 /*
  * This file defines an interface struct for Avro data.  Most of the
