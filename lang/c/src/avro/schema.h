@@ -24,10 +24,10 @@ extern "C" {
 #define CLOSE_EXTERN
 #endif
 
-#include <avro/platform.h>
+#include "platform.h"
 #include <stdlib.h>
 
-#include <avro/basics.h>
+#include "basics.h"
 
 typedef struct avro_obj_t *avro_schema_t;
 
