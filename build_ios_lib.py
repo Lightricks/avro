@@ -32,7 +32,7 @@ class Builder:
         return self.get_path_relative_to_script("ios-cmake", "ios.toolchain.cmake")
 
     def get_platforms(self):
-        return ["SIMULATOR64", "OS64"]
+        return ["SIMULATOR64", "OS64", "SIMULATORARM64"]
 
     def _build(self, out_dir, root_dir, lib_name, extra_cmake_flags):
         out_dir = os.path.abspath(out_dir)
