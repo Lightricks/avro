@@ -32,7 +32,10 @@ class Builder:
         return self.get_path_relative_to_script("ios-cmake", "ios.toolchain.cmake")
 
     def get_platforms(self):
-        return ["SIMULATOR64", "OS64", "SIMULATORARM64"]
+        return {
+            "simulator": ["SIMULATOR64", "SIMULATORARM64"],
+            "device": ["OS64"],
+        }
 
     def _build(self, out_dir, root_dir, lib_name, extra_cmake_flags):
         out_dir = os.path.abspath(out_dir)
@@ -40,34 +43,45 @@ class Builder:
         os.makedirs(out_dir, exist_ok=True)
         build_path = os.path.join(out_dir, lib_name, "build")
 
-        for platform in self.get_platforms():
-            platform_build_dir = os.path.join(build_path, platform)
-            os.makedirs(platform_build_dir, exist_ok=True)
-            print("Creating directory " + platform_build_dir)
-            platform_install_dir = os.path.join(out_dir, platform)
-            self.build_platform(platform, platform_build_dir, platform_install_dir, root_dir, extra_cmake_flags)
+        for platform_group, platforms in self.get_platforms().items():
+            for platform in platforms:
+                platform_build_dir = os.path.join(build_path, platform)
+                os.makedirs(platform_build_dir, exist_ok=True)
+                print("Creating directory " + platform_build_dir)
+                platform_install_dir = os.path.join(out_dir, platform)
+                self.build_platform(platform, platform_build_dir, platform_install_dir, root_dir, extra_cmake_flags)
+
+
 
     def merge_libs(self, out_dir, lib_name):
         out_dir = os.path.abspath(out_dir)
         platform_libs_path = os.path.join(out_dir, "intermediate")
         os.makedirs(platform_libs_path, exist_ok=True)
 
-        platforms = self.get_platforms()
+        framework_paths = []
 
-        for platform in platforms:
-            platform_install_dir = self.platform_install_dir(out_dir, platform)
-            platform_merged_lib_file = os.path.join(platform_libs_path, self.platform_lib_file(lib_name, platform))
-            platform_lib_dir = os.path.join(platform_install_dir, "lib")
-            self.merge_libs_in_directory(platform_lib_dir, platform_merged_lib_file)
+        for platform_group, platforms in self.get_platforms().items():
+            platform_group_dir = os.path.join(platform_libs_path, platform_group)
+            os.makedirs(platform_group_dir, exist_ok=True)
 
-        framework_path = os.path.join(out_dir, f"{lib_name}.framework")
-        framework_include_path = os.path.join(framework_path, "Headers")
-        os.makedirs(framework_path, exist_ok=True)
-        os.makedirs(framework_include_path, exist_ok=True)
+            for platform in platforms:
+                platform_install_dir = self.platform_install_dir(out_dir, platform)
+                platform_merged_lib_file = os.path.join(platform_group_dir, self.platform_lib_file(lib_name, platform))
+                platform_lib_dir = os.path.join(platform_install_dir, "lib")
+                self.merge_libs_in_directory(platform_lib_dir, platform_merged_lib_file)
 
-        self.create_universal_static_lib(platform_libs_path, os.path.join(framework_path, lib_name))
-        platform_include_dir = os.path.join(self.platform_install_dir(out_dir, platforms[0]), "include")
-        shutil.copytree(platform_include_dir, framework_include_path, dirs_exist_ok=True)
+            framework_path = os.path.join(platform_group_dir, f"{lib_name}.framework")
+            framework_include_path = os.path.join(framework_path, "Headers")
+            os.makedirs(framework_path, exist_ok=True)
+            shutil.rmtree(framework_include_path, ignore_errors=True)
+
+            self.create_universal_static_lib(platform_group_dir, os.path.join(framework_path, lib_name))
+            platform_include_dir = os.path.join(self.platform_install_dir(out_dir, platforms[0]), "include")
+            shutil.copytree(platform_include_dir, framework_include_path)
+            framework_paths.append(framework_path)
+
+        out_xcframework_path = os.path.join(out_dir, "xcframework", f"{lib_name}.xcframework")
+        self.create_xcframework(framework_paths, out_xcframework_path)
 
     def platform_install_dir(self, out_dir, platform):
         return os.path.join(out_dir, platform)
@@ -134,6 +148,14 @@ class Builder:
         lipocmd.extend(["-o", out_lib_file_path])
         print("Creating universal library from:\n\t%s" % "\n\t".join(libs), file=sys.stderr)
         execute(lipocmd)
+
+    def create_xcframework(self, framework_paths, out_xcframework_path):
+        xcodebuild_cmd = ["xcodebuild", "-create-xcframework"]
+        framework_arg_pairs = [["-framework", framework_path] for framework_path in framework_paths]
+        xcodebuild_cmd.extend([arg for pair in framework_arg_pairs for arg in pair])
+        xcodebuild_cmd.extend(["-output", out_xcframework_path])
+        print("Creating xcframework from:\n\t%s" % "\n\t".join(framework_paths), file=sys.stderr)
+        execute(xcodebuild_cmd)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='The script builds Avro static lib for iOS.')

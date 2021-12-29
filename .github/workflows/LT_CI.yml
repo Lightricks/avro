@@ -10,15 +10,12 @@ jobs:
         submodules: recursive
 
     - name: Build Release
-      run: |
-        ./build_ios_lib.py out --configuration Release
-        zip --symlinks -r avro_ios_framework.zip out/avro.framework
-        zip --symlinks -r avro_ios_build_data.zip out
+      run: ./build_ios_lib.py out --configuration Release
     - uses: actions/upload-artifact@v2
       with:
         name: ios_lib
-        path: avro_ios_framework.zip
+        path: out/xcframework
     - uses: actions/upload-artifact@v2
       with:
         name: ios_build_data
-        path: avro_ios_build_data.zip
+        path: out
